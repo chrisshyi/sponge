@@ -5,6 +5,24 @@
 
 #include <cstdint>
 #include <string>
+#include <list>
+#include <optional>
+#include <numeric>
+
+using std::string;
+
+struct Interval {
+    size_t start = 0;
+    size_t end = 0;
+    std::string data = "";
+    bool eof = false;
+
+    bool contains_byte(size_t) const;
+    void truncate(size_t);
+    size_t size() const { return end - start + 1; };
+    bool contains_eof() const { return eof; };
+    bool contains(const Interval&) const;
+};
 
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
 //! possibly overlapping) into an in-order byte stream.
@@ -14,6 +32,14 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+    std::list<Interval> intervals;
+    size_t first_unassembled = 0;
+    size_t calc_max_index();
+    void add_interval(Interval);
+    bool next_byte_ready();
+    std::optional<Interval> gen_new_interval(const string&, const size_t, const bool);
+    void write_to_byte_stream();
+
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.

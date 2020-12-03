@@ -28,6 +28,7 @@ int main() {
 
         // overlapping segments
         for (unsigned rep_no = 0; rep_no < NREPS; ++rep_no) {
+            cout << "Run " << rep_no << " of " << NREPS << endl;
             StreamReassembler buf{NSEGS * MAX_SEG_LEN};
 
             vector<tuple<size_t, size_t>> seq_size;
