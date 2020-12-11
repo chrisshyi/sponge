@@ -177,6 +177,9 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         }
         return;
     }
+    if (index + data.size() - 1 < first_unassembled) {
+        return;
+    }
     auto new_interval_op = gen_new_interval(data, index, eof);
     if (!new_interval_op.has_value()) {
         return;
