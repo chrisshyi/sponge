@@ -180,7 +180,10 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
 size_t StreamReassembler::unassembled_bytes() const {
     size_t sum_unassembled_bytes = 0;
     for (auto const& interval : intervals) {
-        sum_unassembled_bytes += interval.end - interval.start + 1;
+        if (interval.end < first_unassembled) {
+            continue;
+        }
+        sum_unassembled_bytes += interval.end - std::max(interval.start, first_unassembled) + 1;
     }
     return sum_unassembled_bytes;
 }
