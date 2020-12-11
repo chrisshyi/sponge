@@ -82,24 +82,23 @@ void StreamReassembler::add_interval(Interval new_interval) {
         return;
     }
     auto it = intervals.begin();
-    std::list<Interval> merged_list;
+    // std::list<Interval> merged_list;
     bool inserted = false;
     while (it != intervals.end()) {
         if (overlap(new_interval, *it)) {
             new_interval = merge_interval(new_interval, *it);
-        } else if (it->start > new_interval.start) {  // doesn't overlap, and is completely to the right
-            merged_list.push_back(new_interval);
-            merged_list.push_back(*it);
+            it = intervals.erase(it);
+            continue;
+        } else if (it->start > new_interval.end) {  // doesn't overlap, and is completely to the right
+            intervals.insert(it, new_interval);
             inserted = true;
-        } else {
-            merged_list.push_back(*it);
+            break;
         }
-        it = std::next(it);
+        it = std::next(it);  // doesn't overlap and *it is completely to the left
     }
     if (!inserted) {
-        merged_list.push_back(new_interval);
+        intervals.push_back(new_interval);
     }
-    intervals = std::move(merged_list);
     return;
 }
 
@@ -141,6 +140,9 @@ bool StreamReassembler::contains_eof_byte(size_t start, size_t end) const {
 }
 
 void StreamReassembler::write_to_byte_stream() {
+    if (_output.remaining_capacity() < 1) {
+        return;
+    }
     auto first_interval = intervals.front();
     auto start_of_to_write = first_unassembled - first_interval.start;
     size_t len_to_write = first_interval.end - first_unassembled + 1;

@@ -14,6 +14,8 @@
 
 using namespace std;
 
+// static constexpr unsigned NREPS = 32;
+// static constexpr unsigned NSEGS = 128;
 static constexpr unsigned NREPS = 32;
 static constexpr unsigned NSEGS = 128;
 static constexpr unsigned MAX_SEG_LEN = 2048;
