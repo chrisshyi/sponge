@@ -46,13 +46,12 @@ Interval merge_interval(const Interval& i1, const Interval& i2) {
             right = &i1;    
         }
     }
-    bool new_eof = left->contains_eof() || right->contains_eof();
     if (left->contains(*right)) {
-        return Interval{left->start, left->end, left->data, new_eof};
+        return Interval{left->start, left->end, left->data};
     }
     string new_data = left->data.substr(0, right->start - left->start) + right->data;
 
-    return Interval{left->start, right->end, new_data, new_eof};
+    return Interval{left->start, right->end, new_data};
 }
 
 bool Interval::contains_byte(size_t index) const {
@@ -106,7 +105,7 @@ void StreamReassembler::add_interval(Interval new_interval) {
 
 
 StreamReassembler::StreamReassembler(const size_t capacity) 
-: _output(capacity), _capacity(capacity), intervals() {}
+: _output(capacity), _capacity(capacity), intervals(), eof_index() {}
 
 
 size_t StreamReassembler::calc_max_index() {
@@ -123,33 +122,45 @@ std::optional<Interval> StreamReassembler::gen_new_interval(const string& data, 
     if (index + data.size() - 1 > max_index) {
         new_interval.end = max_index;
         new_interval.data = data.substr(0, max_index - index + 1);
-        new_interval.eof = false;
     } else {
         new_interval.end = index + data.size() - 1;
         new_interval.data = data;
-        new_interval.eof = eof;
+    }
+    if (eof) {
+        eof_index = std::optional<size_t>(index + data.size() - 1);
     }
     return std::optional(new_interval);
+}
+
+bool StreamReassembler::contains_eof_byte(size_t start, size_t end) const {
+    if (!eof_index.has_value()) {
+        return false;
+    }
+    size_t eof_index_val = eof_index.value();
+    return start <= eof_index_val and eof_index_val <= end;
 }
 
 void StreamReassembler::write_to_byte_stream() {
     auto first_interval = intervals.front();
     auto start_of_to_write = first_unassembled - first_interval.start;
     size_t len_to_write = first_interval.end - first_unassembled + 1;
+    size_t end_of_to_write;
     if (_output.remaining_capacity() < len_to_write) {
         auto new_len = len_to_write - _output.remaining_capacity();
         string to_write = first_interval.data.substr(start_of_to_write, _output.remaining_capacity());
+        end_of_to_write = start_of_to_write + _output.remaining_capacity() - 1;
         first_unassembled = first_unassembled + _output.remaining_capacity();
         _output.write(to_write);
         first_interval.truncate(new_len);
     } else {
         string to_write = first_interval.data.substr(start_of_to_write, len_to_write);
         _output.write(to_write);
+        end_of_to_write = first_interval.end;
         first_unassembled = first_interval.end + 1;
-        if (first_interval.contains_eof()) {
-            _output.end_input();
-        }
         intervals.pop_front();
+    }
+    if (contains_eof_byte(start_of_to_write, end_of_to_write)) {
+        _output.end_input();
     }
 }
 

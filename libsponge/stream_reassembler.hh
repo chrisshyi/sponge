@@ -15,12 +15,10 @@ struct Interval {
     size_t start = 0;
     size_t end = 0;
     std::string data = "";
-    bool eof = false;
 
     bool contains_byte(size_t) const;
     void truncate(size_t);
     size_t size() const { return end - start + 1; };
-    bool contains_eof() const { return eof; };
     bool contains(const Interval&) const;
 };
 
@@ -34,11 +32,13 @@ class StreamReassembler {
     size_t _capacity;    //!< The maximum number of bytes
     std::list<Interval> intervals;
     size_t first_unassembled = 0;
+    std::optional<size_t> eof_index;
     size_t calc_max_index();
     void add_interval(Interval);
     bool next_byte_ready();
     std::optional<Interval> gen_new_interval(const string&, const size_t, const bool);
     void write_to_byte_stream();
+    bool contains_eof_byte(size_t, size_t) const;
 
 
   public:
