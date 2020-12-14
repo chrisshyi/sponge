@@ -34,7 +34,7 @@ optional<WrappingInt32> TCPReceiver::ackno() const {
     uint64_t seqno_64 = (_reassembler.first_unassembled + static_cast<size_t>(isn.value().raw_value())) % u32;
     uint32_t raw_ackno = static_cast<uint32_t>(seqno_64);
     if (_reassembler.stream_out().input_ended()) {
-        raw_ackno += 1;
+        raw_ackno += 1; // increment to account for FIN seqno
     }
     return std::optional(WrappingInt32(raw_ackno));
 }
