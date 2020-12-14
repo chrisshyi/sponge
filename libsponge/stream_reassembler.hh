@@ -39,7 +39,7 @@ class StreamReassembler {
     std::optional<Interval> gen_new_interval(const string&, const size_t, const bool);
     void write_to_byte_stream();
     bool contains_eof_byte(size_t, size_t) const;
-
+    friend class TCPReceiver;
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
