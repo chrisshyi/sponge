@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <queue>
+#include <set>
 
 
 class RetransTimer {
@@ -48,7 +49,10 @@ class TCPSender {
     uint64_t _next_seqno{0};
     
     RetransTimer _timer;
-
+    
+    std::set<TCPSegment> _segments_in_flight;
+    
+    unsigned int _num_consec_retrans{0};
   public:
     //! Initialize a TCPSender
     TCPSender(const size_t capacity = TCPConfig::DEFAULT_CAPACITY,

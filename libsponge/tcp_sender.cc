@@ -21,9 +21,16 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
     : _isn(fixed_isn.value_or(WrappingInt32{random_device()()}))
     , _initial_retransmission_timeout{retx_timeout}
     , _stream(capacity)
-    , _timer() {}
+    , _timer() 
+    , _segments_in_flight() {}
 
-uint64_t TCPSender::bytes_in_flight() const { return {}; }
+uint64_t TCPSender::bytes_in_flight() const {
+    uint64_t total_bytes = 0;
+    for (const auto& segment : _segments_in_flight) {
+        total_bytes += segment.length_in_sequence_space();
+    }
+    return total_bytes;
+}
 
 void TCPSender::fill_window() {}
 
@@ -34,7 +41,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last_tick); }
 
-unsigned int TCPSender::consecutive_retransmissions() const { return {}; }
+unsigned int TCPSender::consecutive_retransmissions() const { return _num_consec_retrans; }
 
 void TCPSender::send_empty_segment() {}
 
