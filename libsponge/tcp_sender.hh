@@ -9,6 +9,21 @@
 #include <functional>
 #include <queue>
 
+
+class RetransTimer {
+    bool started = false;
+    size_t time_remaining = 0;
+    bool expired = false;
+
+    public:
+      void start(size_t);
+      void stop();
+      bool has_started() const;
+      size_t get_time_remaining() const;
+      bool has_expired() const;
+      void tick(size_t);
+};
+
 //! \brief The "sender" part of a TCP implementation.
 
 //! Accepts a ByteStream, divides it up into segments and sends the
@@ -91,19 +106,5 @@ class TCPSender {
     //!@}
 };
 
-class RetransTimer {
-    bool started = false;
-    size_t time_remaining = 0;
-    bool expired = false;
-
-    public:
-      RetransTimer();
-      void start(size_t);
-      void stop();
-      bool has_started() const;
-      size_t get_time_remaining() const;
-      bool has_expired() const;
-      void tick(size_t);
-};
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
