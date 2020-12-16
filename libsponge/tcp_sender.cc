@@ -57,7 +57,7 @@ size_t RetransTimer::get_time_remaining() const {
 
 bool RetransTimer::has_expired() const { return expired; }
 
-void RetransTimer::tick(size_t ms_elapsed) {
+void RetransTimer::tick(const size_t ms_elapsed) {
     if (ms_elapsed >= time_remaining) {
         expired = true;
         return;

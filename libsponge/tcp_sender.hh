@@ -21,7 +21,7 @@ class RetransTimer {
       bool has_started() const;
       size_t get_time_remaining() const;
       bool has_expired() const;
-      void tick(size_t);
+      void tick(const size_t);
 };
 
 //! \brief The "sender" part of a TCP implementation.
