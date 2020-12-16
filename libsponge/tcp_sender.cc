@@ -64,3 +64,9 @@ void RetransTimer::tick(size_t ms_elapsed) {
     }
     time_remaining -= ms_elapsed;
 }
+
+bool operator< (const TCPSegment& s1, const TCPSegment& s2) {
+    uint32_t s1_seqno = s1.header().seqno.raw_value(), s2_seqno = s2.header().seqno.raw_value();
+    auto u32_less = std::less<uint32_t>();
+    return u32_less(s1_seqno, s2_seqno);
+}

@@ -106,5 +106,6 @@ class TCPSender {
     //!@}
 };
 
+bool operator< (const TCPSegment& s1, const TCPSegment& s2);
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
