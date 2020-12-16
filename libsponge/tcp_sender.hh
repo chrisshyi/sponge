@@ -89,4 +89,19 @@ class TCPSender {
     //!@}
 };
 
+class RetransTimer {
+    bool started = false;
+    size_t time_remaining = 0;
+    bool expired = false;
+
+    public:
+      RetransTimer();
+      void start(size_t);
+      void stop();
+      bool has_started() const;
+      size_t get_time_remaining() const;
+      bool has_expired() const;
+      void tick(size_t);
+};
+
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH

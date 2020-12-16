@@ -36,3 +36,30 @@ void TCPSender::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last
 unsigned int TCPSender::consecutive_retransmissions() const { return {}; }
 
 void TCPSender::send_empty_segment() {}
+
+
+void RetransTimer::start(size_t rto) {
+    started = true;
+    time_remaining = rto;
+    expired = false;
+}
+
+void RetransTimer::stop() {
+    started = false;
+}
+
+bool RetransTimer::has_started() const { return started; }
+
+size_t RetransTimer::get_time_remaining() const {
+    return time_remaining;
+}
+
+bool RetransTimer::has_expired() const { return expired; }
+
+void RetransTimer::tick(size_t ms_elapsed) {
+    if (ms_elapsed >= time_remaining) {
+        expired = true;
+        return;
+    }
+    time_remaining -= ms_elapsed;
+}
