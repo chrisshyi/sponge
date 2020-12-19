@@ -19,7 +19,7 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     if (!isn.has_value()) {
         return; // no SYN received yet
     }
-    uint64_t abs_seqno = unwrap(header.seqno, isn.value(), _reassembler.first_unassembled);
+    uint64_t abs_seqno = unwrap(header.seqno, isn.value(), _reassembler.first_unassembled - 1);
     if (header.syn) {
         abs_seqno += 1;
     }

@@ -20,30 +20,128 @@ using namespace std;
 TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const std::optional<WrappingInt32> fixed_isn)
     : _isn(fixed_isn.value_or(WrappingInt32{random_device()()}))
     , _initial_retransmission_timeout{retx_timeout}
+    , _cur_rto{retx_timeout}
     , _stream(capacity)
     , _timer() 
     , _segments_in_flight() {}
 
-uint64_t TCPSender::bytes_in_flight() const {
-    uint64_t total_bytes = 0;
-    for (const auto& segment : _segments_in_flight) {
-        total_bytes += segment.length_in_sequence_space();
+bool TCPSender::segment_acked(const TCPSegment& segment, const size_t& abs_ackno) {
+    auto header = segment.header();
+    if (unwrap(header.seqno, _isn, _next_seqno) + segment.length_in_sequence_space() <= abs_ackno) {
+        return true;
     }
-    return total_bytes;
+    return false;
 }
 
-void TCPSender::fill_window() {}
+void TCPSender::ack_inflight_segments(const size_t& abs_ackno) {
+    while (!_segments_in_flight.empty()) {
+        auto first_seg = _segments_in_flight.front();
+        if (segment_acked(first_seg, abs_ackno)) {
+            _segments_in_flight.pop();
+            _num_bytes_in_flight -= first_seg.length_in_sequence_space();
+        } else {
+            break;
+        }
+    }
+    if (_segments_in_flight.empty()) {
+        _timer.stop();
+    }
+}
+
+uint64_t TCPSender::bytes_in_flight() const {
+    return _num_bytes_in_flight;
+}
+
+TCPSegment TCPSender::gen_new_segment(size_t send_window) { 
+    size_t bytes_to_read = send_window;
+    TCPSegment new_segment;
+    bool set_syn = false, set_fin = false;
+    if (_next_seqno == 0) {
+        bytes_to_read -= 1;
+        set_syn = true;
+    }
+    if (_stream.buffer_size() < bytes_to_read) {
+        set_fin = true;
+        fin_sent = true;
+        bytes_to_read = _stream.buffer_size();
+    }
+    new_segment.header().syn = set_syn;
+    new_segment.header().fin = set_fin;
+    new_segment.payload() = Buffer{_stream.read(bytes_to_read)};
+    new_segment.header().seqno = wrap(_next_seqno, _isn);
+    _next_seqno += new_segment.length_in_sequence_space();
+    return new_segment;
+}
+
+void TCPSender::send_segment(size_t send_window) {
+    auto new_segment = gen_new_segment(send_window);
+    _segments_out.push(new_segment);
+    _segments_in_flight.push(new_segment);
+    _num_bytes_in_flight += new_segment.length_in_sequence_space();        
+    if (!_timer.has_started()) {
+        _timer.start(_cur_rto);
+    }
+}
+
+void TCPSender::fill_window() {
+    uint64_t rwnd_u64 = static_cast<uint64_t>(_latest_rwnd);
+    if (rwnd_u64 == 0) {
+        send_segment(1);
+    } else if (_num_bytes_in_flight < rwnd_u64) {
+        size_t bytes_to_send = rwnd_u64 - _num_bytes_in_flight;
+        while (bytes_to_send > 0 and !_stream.eof()) {
+            size_t send_window;
+            if (bytes_to_send > TCPConfig::MAX_PAYLOAD_SIZE) {
+                send_window = TCPConfig::MAX_PAYLOAD_SIZE;
+            } else {
+                send_window = bytes_to_send;
+            }
+            bytes_to_send -= send_window;
+            send_segment(send_window);
+        }
+        if (_stream.eof() and !fin_sent and bytes_to_send > 0) {
+            send_segment(1);
+        }
+    }
+}
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
-void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) { DUMMY_CODE(ackno, window_size); }
+void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
+    auto abs_ackno = unwrap(ackno, _isn, _latest_abs_ack);
+    if (abs_ackno <= _latest_abs_ack) {  // do nothing if already acknowledged
+        return;
+    }
+    _cur_rto = _initial_retransmission_timeout;
+    _num_consec_retrans = 0;
+    if (!_segments_in_flight.empty()) {
+        _timer.start(_cur_rto);
+    }
+    _latest_abs_ack = abs_ackno;
+    ack_inflight_segments(abs_ackno);
+    _latest_rwnd = window_size;
+    fill_window();
+}
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
-void TCPSender::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last_tick); }
+void TCPSender::tick(const size_t ms_since_last_tick) {
+    _timer.tick(ms_since_last_tick);
+    if (_timer.has_expired()) {
+        auto earliest_seg = _segments_in_flight.front();
+        _segments_out.push(earliest_seg);
+        if (_latest_rwnd != 0) {
+            _num_consec_retrans += 1;
+            _cur_rto += _cur_rto;
+        }
+        _timer.start(_cur_rto);
+    }
+}
 
 unsigned int TCPSender::consecutive_retransmissions() const { return _num_consec_retrans; }
 
-void TCPSender::send_empty_segment() {}
+void TCPSender::send_empty_segment() {
+    _segments_out.push(gen_new_segment(0));
+}
 
 
 void RetransTimer::start(size_t rto) {

@@ -8,7 +8,6 @@
 
 #include <functional>
 #include <queue>
-#include <set>
 
 
 class RetransTimer {
@@ -42,17 +41,37 @@ class TCPSender {
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
 
+    unsigned int _cur_rto;
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
     
+    bool fin_sent{false};
+    //! Retransmission timer object
     RetransTimer _timer;
     
-    std::set<TCPSegment> _segments_in_flight;
+    // Number of bytes in flight
+    size_t _num_bytes_in_flight{0};
     
+    //! Set of TCPSegments in flight (sent but not acknowledged)
+    std::queue<TCPSegment> _segments_in_flight;
+    
+    //! Number of consecutive retransmissions
     unsigned int _num_consec_retrans{0};
+    
+    //! Latest acknowledged absolute sequence number
+    size_t _latest_abs_ack{0};
+    
+    //! Latest receive window size
+    uint16_t _latest_rwnd{0};
+    
+    void ack_inflight_segments(const size_t&);
+    bool segment_acked(const TCPSegment&, const size_t&);
+    TCPSegment gen_new_segment(size_t);
+    void send_segment(size_t);
+    
   public:
     //! Initialize a TCPSender
     TCPSender(const size_t capacity = TCPConfig::DEFAULT_CAPACITY,
