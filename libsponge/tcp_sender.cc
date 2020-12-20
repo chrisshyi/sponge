@@ -60,6 +60,14 @@ TCPSegment TCPSender::gen_new_segment(size_t send_window) {
         bytes_to_read -= 1;
         set_syn = true;
     }
+    if (_stream.eof()) {
+        new_segment.header().syn = set_syn;
+        new_segment.payload() = Buffer{};
+        new_segment.header().fin = true;
+        new_segment.header().seqno = wrap(_next_seqno, _isn);
+        _next_seqno += new_segment.length_in_sequence_space();
+        return new_segment;
+    }
     if (_stream.buffer_size() < bytes_to_read) {
         bytes_to_read = _stream.buffer_size();
         if (_stream.input_ended()) {
