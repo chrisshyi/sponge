@@ -64,6 +64,7 @@ TCPSegment TCPSender::gen_new_segment(size_t send_window) {
         new_segment.header().syn = set_syn;
         new_segment.payload() = Buffer{};
         new_segment.header().fin = true;
+        fin_sent = true;
         new_segment.header().seqno = wrap(_next_seqno, _isn);
         _next_seqno += new_segment.length_in_sequence_space();
         return new_segment;
@@ -99,8 +100,11 @@ size_t TCPSender::send_segment(size_t send_window) {
 }
 
 void TCPSender::fill_window() {
+    if (fin_sent) {
+        return;
+    }
     uint64_t rwnd_u64 = static_cast<uint64_t>(_latest_rwnd);
-    if (rwnd_u64 == 0) {
+    if (rwnd_u64 == 0 and _num_bytes_in_flight == 0) {
         send_segment(1);
     } else if (_num_bytes_in_flight < rwnd_u64) {
         size_t window_space = rwnd_u64 - _num_bytes_in_flight;
