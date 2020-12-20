@@ -53,7 +53,7 @@ uint64_t TCPSender::bytes_in_flight() const {
 }
 
 TCPSegment TCPSender::gen_new_segment(size_t send_window) { 
-    size_t bytes_to_read = std::min(send_window, TCPConfig::MAX_PAYLOAD_SIZE);
+    size_t bytes_to_read = send_window;
     TCPSegment new_segment;
     bool set_syn = false, set_fin = false;
     if (_next_seqno == 0) {
@@ -62,13 +62,13 @@ TCPSegment TCPSender::gen_new_segment(size_t send_window) {
     }
     if (_stream.buffer_size() < bytes_to_read) {
         bytes_to_read = _stream.buffer_size();
+        if (_stream.input_ended()) {
+            set_fin = true;
+            fin_sent = true;
+        }
     }
     new_segment.header().syn = set_syn;
     new_segment.payload() = Buffer{_stream.read(bytes_to_read)};
-    if (_stream.eof() and bytes_to_read < send_window) {
-        set_fin = true;
-        fin_sent = true;
-    }
     new_segment.header().fin = set_fin;
     new_segment.header().seqno = wrap(_next_seqno, _isn);
     _next_seqno += new_segment.length_in_sequence_space();
@@ -95,12 +95,11 @@ void TCPSender::fill_window() {
     if (rwnd_u64 == 0) {
         send_segment(1);
     } else if (_num_bytes_in_flight < rwnd_u64) {
-        size_t seqnos_sent = 0;
         size_t window_space = rwnd_u64 - _num_bytes_in_flight;
         while (window_space > 0 and !_stream.eof()) {
             size_t send_window;
-            if (window_space > TCPConfig::MAX_PAYLOAD_SIZE + 2) {
-                send_window = TCPConfig::MAX_PAYLOAD_SIZE + 2;
+            if (window_space > TCPConfig::MAX_PAYLOAD_SIZE) {
+                send_window = TCPConfig::MAX_PAYLOAD_SIZE;
             } else {
                 send_window = window_space;
             }
