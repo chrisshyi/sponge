@@ -53,7 +53,7 @@ uint64_t TCPSender::bytes_in_flight() const {
 }
 
 TCPSegment TCPSender::gen_new_segment(size_t send_window) { 
-    size_t bytes_to_read = send_window;
+    size_t bytes_to_read = std::min(send_window, TCPConfig::MAX_PAYLOAD_SIZE);
     TCPSegment new_segment;
     bool set_syn = false, set_fin = false;
     if (_next_seqno == 0) {
@@ -61,26 +61,33 @@ TCPSegment TCPSender::gen_new_segment(size_t send_window) {
         set_syn = true;
     }
     if (_stream.buffer_size() < bytes_to_read) {
-        set_fin = true;
-        fin_sent = true;
         bytes_to_read = _stream.buffer_size();
     }
     new_segment.header().syn = set_syn;
-    new_segment.header().fin = set_fin;
     new_segment.payload() = Buffer{_stream.read(bytes_to_read)};
+    if (_stream.eof() and bytes_to_read < send_window) {
+        set_fin = true;
+        fin_sent = true;
+    }
+    new_segment.header().fin = set_fin;
     new_segment.header().seqno = wrap(_next_seqno, _isn);
     _next_seqno += new_segment.length_in_sequence_space();
     return new_segment;
 }
 
-void TCPSender::send_segment(size_t send_window) {
+size_t TCPSender::send_segment(size_t send_window) {
     auto new_segment = gen_new_segment(send_window);
+    auto seqno_len = new_segment.length_in_sequence_space();
+    if (seqno_len == 0) {
+        return 0;
+    }
     _segments_out.push(new_segment);
     _segments_in_flight.push(new_segment);
     _num_bytes_in_flight += new_segment.length_in_sequence_space();        
     if (!_timer.has_started()) {
         _timer.start(_cur_rto);
     }
+    return seqno_len;
 }
 
 void TCPSender::fill_window() {
@@ -88,18 +95,19 @@ void TCPSender::fill_window() {
     if (rwnd_u64 == 0) {
         send_segment(1);
     } else if (_num_bytes_in_flight < rwnd_u64) {
-        size_t bytes_to_send = rwnd_u64 - _num_bytes_in_flight;
-        while (bytes_to_send > 0 and !_stream.eof()) {
+        size_t seqnos_sent = 0;
+        size_t window_space = rwnd_u64 - _num_bytes_in_flight;
+        while (window_space > 0 and !_stream.eof()) {
             size_t send_window;
-            if (bytes_to_send > TCPConfig::MAX_PAYLOAD_SIZE) {
-                send_window = TCPConfig::MAX_PAYLOAD_SIZE;
+            if (window_space > TCPConfig::MAX_PAYLOAD_SIZE + 2) {
+                send_window = TCPConfig::MAX_PAYLOAD_SIZE + 2;
             } else {
-                send_window = bytes_to_send;
+                send_window = window_space;
             }
-            bytes_to_send -= send_window;
+            window_space -= send_window;
             send_segment(send_window);
         }
-        if (_stream.eof() and !fin_sent and bytes_to_send > 0) {
+        if (_stream.eof() and !fin_sent and window_space > 0) {
             send_segment(1);
         }
     }
@@ -109,15 +117,14 @@ void TCPSender::fill_window() {
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
     auto abs_ackno = unwrap(ackno, _isn, _latest_abs_ack);
-    if (abs_ackno <= _latest_abs_ack) {  // do nothing if already acknowledged
-        return;
+    if (abs_ackno > _latest_abs_ack) {
+        _cur_rto = _initial_retransmission_timeout;
+        _num_consec_retrans = 0;
+        if (!_segments_in_flight.empty()) {
+            _timer.start(_cur_rto);
+        }
     }
-    _cur_rto = _initial_retransmission_timeout;
-    _num_consec_retrans = 0;
-    if (!_segments_in_flight.empty()) {
-        _timer.start(_cur_rto);
-    }
-    _latest_abs_ack = abs_ackno;
+    _latest_abs_ack = std::max(abs_ackno, _latest_abs_ack);
     ack_inflight_segments(abs_ackno);
     _latest_rwnd = window_size;
     fill_window();

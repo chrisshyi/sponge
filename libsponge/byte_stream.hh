@@ -20,7 +20,6 @@ class ByteStream {
     bool reached_input_end = false;
     size_t cap;
     size_t used = 0; 
-    bool reached_eof = false;
     size_t num_written = 0;
     size_t num_read = 0;
     std::string buffer{};

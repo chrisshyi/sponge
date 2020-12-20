@@ -65,12 +65,12 @@ class TCPSender {
     size_t _latest_abs_ack{0};
     
     //! Latest receive window size
-    uint16_t _latest_rwnd{0};
+    uint16_t _latest_rwnd{1};
     
     void ack_inflight_segments(const size_t&);
     bool segment_acked(const TCPSegment&, const size_t&);
     TCPSegment gen_new_segment(size_t);
-    void send_segment(size_t);
+    size_t send_segment(size_t);
     
   public:
     //! Initialize a TCPSender
