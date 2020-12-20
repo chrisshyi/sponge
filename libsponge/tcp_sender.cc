@@ -68,7 +68,7 @@ TCPSegment TCPSender::gen_new_segment(size_t send_window) {
         }
     }
     new_segment.header().syn = set_syn;
-    new_segment.payload() = Buffer{_stream.read(bytes_to_read)};
+    new_segment.payload() = Buffer{_stream.read(std::min(bytes_to_read, TCPConfig::MAX_PAYLOAD_SIZE))};
     new_segment.header().fin = set_fin;
     new_segment.header().seqno = wrap(_next_seqno, _isn);
     _next_seqno += new_segment.length_in_sequence_space();
@@ -98,8 +98,8 @@ void TCPSender::fill_window() {
         size_t window_space = rwnd_u64 - _num_bytes_in_flight;
         while (window_space > 0 and !_stream.eof()) {
             size_t send_window;
-            if (window_space > TCPConfig::MAX_PAYLOAD_SIZE) {
-                send_window = TCPConfig::MAX_PAYLOAD_SIZE;
+            if (window_space > TCPConfig::MAX_PAYLOAD_SIZE + 2) {
+                send_window = TCPConfig::MAX_PAYLOAD_SIZE + 2;
             } else {
                 send_window = window_space;
             }
