@@ -5,6 +5,7 @@
 #include "tcp_receiver.hh"
 #include "tcp_sender.hh"
 #include "tcp_state.hh"
+#include <optional>
 
 //! \brief A complete endpoint of a TCP connection
 class TCPConnection {
@@ -12,6 +13,8 @@ class TCPConnection {
     TCPConfig _cfg;
     TCPReceiver _receiver{_cfg.recv_capacity};
     TCPSender _sender{_cfg.send_capacity, _cfg.rt_timeout, _cfg.fixed_isn};
+    size_t current_time = 0;
+    size_t last_segment_received = 0;
 
     //! outbound queue of segments that the TCPConnection wants sent
     std::queue<TCPSegment> _segments_out{};
