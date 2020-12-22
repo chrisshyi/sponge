@@ -26,7 +26,6 @@ size_t TCPConnection::time_since_last_segment_received() const {
 }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
-    // TODO: Finish this
     last_segment_received = current_time;
     auto header = seg.header();
     if (header.rst) {
