@@ -70,7 +70,12 @@ void TCPConnection::end_input_stream() {
     _sender.stream_in().end_input();
 }
 
-void TCPConnection::connect() {}
+void TCPConnection::connect() {
+    _sender.fill_window();
+    auto syn_segment = _sender.segments_out().front();
+    _segments_out.push(syn_segment);
+    _sender.segments_out().pop();
+}
 
 TCPConnection::~TCPConnection() {
     try {
