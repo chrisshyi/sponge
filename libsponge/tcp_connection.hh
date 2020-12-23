@@ -15,6 +15,7 @@ class TCPConnection {
     TCPSender _sender{_cfg.send_capacity, _cfg.rt_timeout, _cfg.fixed_isn};
     size_t current_time = 0;
     size_t last_segment_received = 0;
+    bool rst_sent{false};
 
     //! outbound queue of segments that the TCPConnection wants sent
     std::queue<TCPSegment> _segments_out{};

@@ -28,6 +28,9 @@ size_t TCPConnection::time_since_last_segment_received() const {
 
 void TCPConnection::send_segments(bool set_rst) {
     auto& sender_out_queue = _sender.segments_out();
+    if (set_rst) {
+        rst_sent = true;
+    }
     while (!sender_out_queue.empty()) {
         auto first_seg = sender_out_queue.front();
         if (_receiver.ackno().has_value()) {
@@ -68,7 +71,16 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     }
 }
 
-bool TCPConnection::active() const { return {}; }
+bool TCPConnection::active() const {
+    if (_sender.stream_in().error() and _receiver.stream_out().error()) {
+        return false;
+    }
+    if (rst_sent) {
+        return false;
+    }
+    // TODO: Finish this method
+    return true;
+}
 
 size_t TCPConnection::write(const string &data) {
     auto& sender_stream = _sender.stream_in();
