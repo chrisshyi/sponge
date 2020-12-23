@@ -57,7 +57,9 @@ TCPSegment TCPSender::gen_new_segment(size_t send_window) {
     TCPSegment new_segment;
     bool set_syn = false, set_fin = false;
     if (_next_seqno == 0) {
-        bytes_to_read -= 1;
+        if (bytes_to_read > 0) {
+            bytes_to_read -= 1;
+        }
         set_syn = true;
     }
     if (_stream.eof()) {
@@ -163,7 +165,10 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
 unsigned int TCPSender::consecutive_retransmissions() const { return _num_consec_retrans; }
 
 void TCPSender::send_empty_segment() {
-    _segments_out.push(gen_new_segment(0));
+    auto new_segment = gen_new_segment(0);
+    _num_bytes_in_flight += new_segment.length_in_sequence_space();
+    _segments_out.push(new_segment);
+    _segments_in_flight.push(new_segment);
 }
 
 
