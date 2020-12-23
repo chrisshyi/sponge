@@ -26,15 +26,22 @@ size_t TCPConnection::time_since_last_segment_received() const {
     return current_time - last_segment_received;
 }
 
+void TCPConnection::reset_connection() {
+    conn_reset = true;
+    _sender.stream_in().set_error();
+    _receiver.stream_out().set_error();
+}
+
 void TCPConnection::send_segments(bool set_rst) {
     auto& sender_out_queue = _sender.segments_out();
     if (set_rst) {
-        rst_sent = true;
+        reset_connection();
     }
     while (!sender_out_queue.empty()) {
         auto first_seg = sender_out_queue.front();
         if (_receiver.ackno().has_value()) {
             first_seg.header().ackno = _receiver.ackno().value();
+            first_seg.header().ack = true;
         }
         std::numeric_limits<uint8_t> u8_lim;
         size_t win_size = std::min(_receiver.window_size(), static_cast<size_t>(u8_lim.max()));
@@ -42,15 +49,14 @@ void TCPConnection::send_segments(bool set_rst) {
         first_seg.header().rst = set_rst;
         _segments_out.push(first_seg);
         sender_out_queue.pop();
-    }    
+    }
 }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
     last_segment_received = current_time;
     auto header = seg.header();
     if (header.rst) {
-        _sender.stream_in().set_error();
-        _receiver.stream_out().set_error();
+        reset_connection();
         return;
     }
     _receiver.segment_received(seg);
@@ -72,13 +78,21 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 }
 
 bool TCPConnection::active() const {
-    if (_sender.stream_in().error() and _receiver.stream_out().error()) {
+    if (conn_reset) {
         return false;
     }
-    if (rst_sent) {
-        return false;
+    auto in_stream_assembled = _receiver.stream_out().input_ended();  // pre-req #1
+    auto out_stream_sent = _sender.stream_in().eof() and 
+    (_sender.stream_in().bytes_written() + 2 == _sender.next_seqno_absolute());  // pre-req #2
+    auto out_stream_acked = out_stream_sent and _sender.bytes_in_flight() == 0;  // pre-req #3
+    if (in_stream_assembled and out_stream_sent and out_stream_acked) {
+        if (!_linger_after_streams_finish) {
+            return false;
+        } else if (time_since_last_segment_received() > 10 * _cfg.rt_timeout) {
+            return false;
+        }
+        return true;
     }
-    // TODO: Finish this method
     return true;
 }
 
@@ -116,7 +130,6 @@ TCPConnection::~TCPConnection() {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
             _sender.send_empty_segment();
             send_segments(true);
-            // Your code here: need to send a RST segment to the peer
         }
     } catch (const exception &e) {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
