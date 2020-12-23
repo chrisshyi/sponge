@@ -43,8 +43,8 @@ void TCPConnection::send_segments(bool set_rst) {
             first_seg.header().ackno = _receiver.ackno().value();
             first_seg.header().ack = true;
         }
-        std::numeric_limits<uint8_t> u8_lim;
-        size_t win_size = std::min(_receiver.window_size(), static_cast<size_t>(u8_lim.max()));
+        std::numeric_limits<uint16_t> u16_lim;
+        size_t win_size = std::min(_receiver.window_size(), static_cast<size_t>(u16_lim.max()));
         first_seg.header().win = static_cast<uint8_t>(win_size);
         first_seg.header().rst = set_rst;
         _segments_out.push(first_seg);
