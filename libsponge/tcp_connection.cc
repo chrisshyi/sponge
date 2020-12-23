@@ -88,7 +88,7 @@ bool TCPConnection::active() const {
     if (in_stream_assembled and out_stream_sent and out_stream_acked) {
         if (!_linger_after_streams_finish) {
             return false;
-        } else if (time_since_last_segment_received() > 10 * _cfg.rt_timeout) {
+        } else if (time_since_last_segment_received() >= 10 * _cfg.rt_timeout) {
             return false;
         }
         return true;
@@ -110,11 +110,15 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
     _sender.tick(ms_since_last_tick);
     if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
         send_segments(true);
-    } 
+    } else {
+        send_segments(false);
+    }
 }
 
 void TCPConnection::end_input_stream() {
     _sender.stream_in().end_input();
+    _sender.fill_window();
+    send_segments(false);
 }
 
 void TCPConnection::connect() {

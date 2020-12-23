@@ -36,6 +36,7 @@ int main() {
 
         // test #2: start in CLOSING, send ack, time out
         {
+            cout << "Start test 2" << endl;
             TCPTestHarness test_2 = TCPTestHarness::in_closing(cfg);
 
             test_2.execute(Tick(4 * cfg.rt_timeout));
@@ -54,6 +55,7 @@ int main() {
             test_2.execute(Tick(2));
 
             test_2.execute(ExpectState{State::CLOSED});
+            cout << "End test 2" << endl;
         }
 
         // test #3: start in FIN_WAIT_2, send FIN, time out
