@@ -26,7 +26,7 @@ size_t TCPConnection::time_since_last_segment_received() const {
     return current_time - last_segment_received;
 }
 
-void TCPConnection::send_segments() {
+void TCPConnection::send_segments(bool set_rst) {
     auto& sender_out_queue = _sender.segments_out();
     while (!sender_out_queue.empty()) {
         auto first_seg = sender_out_queue.front();
@@ -36,6 +36,7 @@ void TCPConnection::send_segments() {
         std::numeric_limits<uint8_t> u8_lim;
         size_t win_size = std::min(_receiver.window_size(), static_cast<size_t>(u8_lim.max()));
         first_seg.header().win = static_cast<uint8_t>(win_size);
+        first_seg.header().rst = set_rst;
         _segments_out.push(first_seg);
         sender_out_queue.pop();
     }    
@@ -58,7 +59,12 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
             _sender.send_empty_segment();
         }
         assert(_receiver.ackno().has_value());
-        send_segments();
+        send_segments(false);
+    }
+    if (_receiver.stream_out().input_ended()) {
+        if (!_sender.stream_in().eof()) {
+            _linger_after_streams_finish = false;
+        }
     }
 }
 
@@ -68,7 +74,7 @@ size_t TCPConnection::write(const string &data) {
     auto& sender_stream = _sender.stream_in();
     auto bytes_written = sender_stream.write(data);
     _sender.fill_window();
-    send_segments();
+    send_segments(false);
     return bytes_written;
 }
 
@@ -76,6 +82,9 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     current_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
+    if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
+        send_segments(true);
+    } 
 }
 
 void TCPConnection::end_input_stream() {
@@ -93,7 +102,8 @@ TCPConnection::~TCPConnection() {
     try {
         if (active()) {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
-
+            _sender.send_empty_segment();
+            send_segments(true);
             // Your code here: need to send a RST segment to the peer
         }
     } catch (const exception &e) {

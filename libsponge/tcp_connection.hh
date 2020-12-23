@@ -26,7 +26,7 @@ class TCPConnection {
 
     //! pops segments from _sender's outbound queue and push them to
     //! the connection's outbound queue
-    void send_segments(); 
+    void send_segments(bool);
   public:
     //! \name "Input" interface for the writer
     //!@{
