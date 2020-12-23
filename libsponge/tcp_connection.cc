@@ -25,6 +25,18 @@ size_t TCPConnection::time_since_last_segment_received() const {
     return current_time - last_segment_received;
 }
 
+void TCPConnection::send_segments() {
+    auto& sender_out_queue = _sender.segments_out();
+    while (!sender_out_queue.empty()) {
+        auto first_seg = sender_out_queue.front();
+        if (_receiver.ackno().has_value()) {
+            first_seg.header().ackno = _receiver.ackno().value();
+        }
+        _segments_out.push(first_seg);
+        sender_out_queue.pop();
+    }    
+}
+
 void TCPConnection::segment_received(const TCPSegment &seg) {
     last_segment_received = current_time;
     auto header = seg.header();
@@ -41,23 +53,19 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         if (_sender.segments_out().empty()) {
             _sender.send_empty_segment();
         }
-        auto& sender_out_queue = _sender.segments_out();
-        // TODO: Get the ack number from the receiver and put it on all out-bound segments
         assert(_receiver.ackno().has_value());
-        while (!sender_out_queue.empty()) {
-            auto first_seg = sender_out_queue.front();
-            first_seg.header().ackno = _receiver.ackno().value();
-            _segments_out.push(first_seg);
-            sender_out_queue.pop();
-        }
+        send_segments();
     }
 }
 
 bool TCPConnection::active() const { return {}; }
 
 size_t TCPConnection::write(const string &data) {
-    DUMMY_CODE(data);
-    return {};
+    auto& sender_stream = _sender.stream_in();
+    auto bytes_written = sender_stream.write(data);
+    _sender.fill_window();
+    send_segments();
+    return bytes_written;
 }
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
