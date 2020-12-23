@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cassert>
+#include <limits>
 
 // Dummy implementation of a TCP connection
 
@@ -32,6 +33,9 @@ void TCPConnection::send_segments() {
         if (_receiver.ackno().has_value()) {
             first_seg.header().ackno = _receiver.ackno().value();
         }
+        std::numeric_limits<uint8_t> u8_lim;
+        size_t win_size = std::min(_receiver.window_size(), static_cast<size_t>(u8_lim.max()));
+        first_seg.header().win = static_cast<uint8_t>(win_size);
         _segments_out.push(first_seg);
         sender_out_queue.pop();
     }    
