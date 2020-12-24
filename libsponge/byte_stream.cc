@@ -20,14 +20,14 @@ size_t ByteStream::write(const string &data) {
     std::cout << "Remaining cap: " << remaining_cap << std::endl;
     if (remaining_cap >= data.size()) {
         buffer += data;
-        std::cout << "In buffer: " << buffer << std::endl;
+        // std::cout << "In buffer: " << buffer << std::endl;
         num_written += data.size();
         used += data.size();
         return data.size();
     } else {
         auto to_write = remaining_cap;
         buffer += data.substr(0, to_write);
-        std::cout << "In buffer: " << buffer << std::endl;
+        // std::cout << "In buffer: " << buffer << std::endl;
         num_written += to_write;
         used += to_write;
         return to_write;
@@ -56,7 +56,7 @@ void ByteStream::pop_output(const size_t len) {
     used -= to_pop;
     num_read += to_pop;
     buffer = buffer.substr(to_pop, string::npos);
-    std::cout << "In buffer: " << buffer << std::endl;
+    // std::cout << "In buffer: " << buffer << std::endl;
 }
 
 //! Read (i.e., copy and then pop) the next "len" bytes of the stream

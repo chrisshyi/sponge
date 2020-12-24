@@ -53,7 +53,7 @@ uint64_t TCPSender::bytes_in_flight() const {
 }
 
 TCPSegment TCPSender::gen_new_segment(size_t send_window) { 
-    cout << "gen_new_segment: window size = " << send_window << endl;
+    // cout << "gen_new_segment: window size = " << send_window << endl;
     size_t bytes_to_read = send_window;
     TCPSegment new_segment;
     bool set_syn = false, set_fin = false;
@@ -74,7 +74,7 @@ TCPSegment TCPSender::gen_new_segment(size_t send_window) {
         _next_seqno += new_segment.length_in_sequence_space();
         return new_segment;
     }
-    cout << "Buffer size: " << _stream.buffer_size() << endl;
+    // cout << "Buffer size: " << _stream.buffer_size() << endl;
     if (_stream.buffer_size() < bytes_to_read) {
         bytes_to_read = _stream.buffer_size(); // drain the buffer
         if (_stream.input_ended()) {
@@ -116,13 +116,12 @@ void TCPSender::fill_window() {
         size_t window_space = rwnd_u64 - _num_bytes_in_flight;
         while (window_space > 0 and !_stream.eof()) {
             size_t send_window;
-            cout << "Window space remaining: " << window_space << endl;
+            // cout << "Window space remaining: " << window_space << endl;
             if (window_space > TCPConfig::MAX_PAYLOAD_SIZE + 2) {
                 send_window = TCPConfig::MAX_PAYLOAD_SIZE + 2;
             } else {
                 send_window = window_space;
             }
-            // window_space -= send_window;
             auto seq_len = send_segment(send_window);
             if (seq_len == 0) {
                 break;
