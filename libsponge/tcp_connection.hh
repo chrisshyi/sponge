@@ -29,6 +29,8 @@ class TCPConnection {
     //! the connection's outbound queue
     void send_segments(bool);
     void reset_connection();
+    bool in_syn_sent();
+    bool in_syn_recv();
   public:
     //! \name "Input" interface for the writer
     //!@{

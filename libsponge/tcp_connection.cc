@@ -53,9 +53,18 @@ void TCPConnection::send_segments(bool set_rst) {
 }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
+    if (!active()) {
+        return;
+    }
+    if (in_syn_sent() && seg.header().ack && seg.payload().size() > 0) {
+        return;
+    }
     last_segment_received = current_time;
     auto header = seg.header();
     if (header.rst) {
+        if (in_syn_sent() && !seg.header().ack) {
+            return;
+        }
         reset_connection();
         return;
     }
@@ -147,4 +156,10 @@ TCPConnection::~TCPConnection() {
     } catch (const exception &e) {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
     }
+}
+
+bool TCPConnection::in_syn_recv() { return _receiver.ackno().has_value() && !_receiver.stream_out().input_ended(); }
+
+bool TCPConnection::in_syn_sent() {
+    return _sender.next_seqno_absolute() > 0 && _sender.bytes_in_flight() == _sender.next_seqno_absolute();
 }
