@@ -45,7 +45,7 @@ void TCPConnection::send_segments(bool set_rst) {
         }
         std::numeric_limits<uint16_t> u16_lim;
         size_t win_size = std::min(_receiver.window_size(), static_cast<size_t>(u16_lim.max()));
-        first_seg.header().win = static_cast<uint8_t>(win_size);
+        first_seg.header().win = static_cast<uint16_t>(win_size);
         first_seg.header().rst = set_rst;
         _segments_out.push(first_seg);
         sender_out_queue.pop();
@@ -63,7 +63,8 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     if (header.ack) {
         _sender.ack_received(header.ackno, header.win);
     }
-    if (seg.length_in_sequence_space() > 0)  {
+    if (seg.length_in_sequence_space() > 0) {
+        _sender.fill_window();
         if (_sender.segments_out().empty()) {
             _sender.send_empty_segment();
         }
@@ -108,6 +109,10 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     current_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
+    if (_sender.next_seqno_absolute() > _sender.bytes_in_flight() 
+        and not _sender.stream_in().eof()) {
+        _sender.fill_window();
+    }
     if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
         send_segments(true);
     } else {
