@@ -16,7 +16,7 @@ class TCPConnection {
     size_t current_time = 0;
     size_t last_segment_received = 0;
     bool conn_reset{false};
-
+    bool sender_stream_ongoing();
     //! outbound queue of segments that the TCPConnection wants sent
     std::queue<TCPSegment> _segments_out{};
 

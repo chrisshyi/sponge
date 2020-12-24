@@ -109,8 +109,7 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     current_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
-    if (_sender.next_seqno_absolute() > _sender.bytes_in_flight() 
-        and not _sender.stream_in().eof()) {
+    if (sender_stream_ongoing()) {
         _sender.fill_window();
     }
     if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
@@ -118,6 +117,11 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
     } else {
         send_segments(false);
     }
+}
+
+bool TCPConnection::sender_stream_ongoing() {
+    return (_sender.next_seqno_absolute() > _sender.bytes_in_flight()) 
+        and (not _sender.stream_in().eof());
 }
 
 void TCPConnection::end_input_stream() {
