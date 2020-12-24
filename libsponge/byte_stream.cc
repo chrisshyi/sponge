@@ -16,8 +16,8 @@ ByteStream::ByteStream(const size_t capacity): cap{capacity}, _error{false} {}
 
 size_t ByteStream::write(const string &data) {
     auto remaining_cap = remaining_capacity();
-    std::cout << "Writing data: " << data << std::endl;
-    std::cout << "Remaining cap: " << remaining_cap << std::endl;
+    // std::cout << "Writing data: " << data << std::endl;
+    // std::cout << "Remaining cap: " << remaining_cap << std::endl;
     if (remaining_cap >= data.size()) {
         buffer += data;
         // std::cout << "In buffer: " << buffer << std::endl;

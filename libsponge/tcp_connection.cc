@@ -116,6 +116,9 @@ size_t TCPConnection::write(const string &data) {
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) {
+    if (!active()) {
+        return;
+    }
     current_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
     if (sender_stream_ongoing()) {
