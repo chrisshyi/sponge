@@ -69,8 +69,8 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
             _sender.send_empty_segment();
         }
         assert(_receiver.ackno().has_value());
-        send_segments(false);
     }
+    send_segments(false);
     if (_receiver.stream_out().input_ended()) {
         if (!_sender.stream_in().eof()) {
             _linger_after_streams_finish = false;
