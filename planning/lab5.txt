@@ -1,0 +1,11 @@
+Data Structures:
+
+1. Mapping of IPv4 addresses to EthernetAddress objects, need to also keep track of the age of each mapping
+
+std::unordered_map<uint32_t, std::pair<EthernetAddress, size_t>>
+
+2. Queue of IP datagrams waiting for an ARP response
+
+Create a mapping of IP -> queue of IP datagrams
+
+When an ARP response is received, access the map and send all IP datagrams in the queue
