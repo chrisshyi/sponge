@@ -26,6 +26,37 @@ NetworkInterface::NetworkInterface(const EthernetAddress &ethernet_address, cons
          << ip_address.ip() << "\n";
 }
 
+void NetworkInterface::send_eth_frame_ip(const InternetDatagram &dgram, const EthernetAddress& eth_addr) {
+    EthernetFrame out_frame;
+    EthernetHeader& header = out_frame.header();
+    header.dst = eth_addr;
+    header.src = this->_ethernet_address;
+    header.type = EthernetHeader::TYPE_IPv4;
+    
+    auto& payload = out_frame.payload();
+    payload.append(dgram.serialize());
+    _frames_out.push(out_frame);
+}
+
+void NetworkInterface::send_eth_frame_arp(const uint32_t ip_to_query) {
+    ARPMessage arp_msg;
+    arp_msg.target_ip_address = ip_to_query;
+    arp_msg.sender_ethernet_address = this->_ethernet_address;
+    arp_msg.sender_ip_address = this->_ip_address.ipv4_numeric();
+    arp_msg.opcode = ARPMessage::OPCODE_REQUEST;
+    EthernetFrame out_frame;
+    EthernetHeader& header = out_frame.header();
+    EthernetAddress broadcast_addr;
+    broadcast_addr.fill(255);
+    header.dst = broadcast_addr;
+    header.src = this->_ethernet_address;
+    header.type = EthernetHeader::TYPE_ARP;
+    
+    auto& payload = out_frame.payload();
+    payload.append(BufferList{arp_msg.serialize()});
+    _frames_out.push(out_frame);
+}
+
 //! \param[in] dgram the IPv4 datagram to be sent
 //! \param[in] next_hop the IP address of the interface to send it to (typically a router or default gateway, but may also be another host if directly connected to the same network as the destination)
 //! (Note: the Address type can be converted to a uint32_t (raw 32-bit IP address) with the Address::ipv4_numeric() method.)
@@ -33,7 +64,18 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     // convert IP address of next hop to raw 32-bit representation (used in ARP header)
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
 
-    DUMMY_CODE(dgram, next_hop, next_hop_ip);
+    auto lookup_res = arp_map.find(next_hop_ip);
+    if (lookup_res != arp_map.end()) {
+        send_eth_frame_ip(dgram, (*lookup_res).second.first);
+    } else {
+        auto arp_wait_q_lookup = arp_wait_q.find(next_hop_ip);
+        if (arp_wait_q_lookup == arp_wait_q.end()) { // not already waiting for an ARP response
+            send_eth_frame_arp(next_hop_ip);
+            arp_wait_q.insert(std::make_pair(next_hop_ip, std::queue<InternetDatagram>()));
+            arp_wait_q_lookup = arp_wait_q.find(next_hop_ip);
+        }
+        (*arp_wait_q_lookup).second.push(dgram);
+    }
 }
 
 //! \param[in] frame the incoming Ethernet frame
