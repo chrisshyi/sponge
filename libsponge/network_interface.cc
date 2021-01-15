@@ -134,9 +134,8 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
                 std::make_pair(arp_msg.sender_ethernet_address, static_cast<size_t>(0))
             });
         }
-    } else {
-        return optional<InternetDatagram>();
     }
+        return optional<InternetDatagram>();
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
