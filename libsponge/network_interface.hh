@@ -45,11 +45,12 @@ class NetworkInterface {
     std::queue<EthernetFrame> _frames_out{};
     
     unordered_map<uint32_t, std::pair<EthernetAddress, size_t>> arp_map{};
-    unordered_map<uint32_t, std::queue<InternetDatagram>> arp_wait_q{};
+    unordered_map<uint32_t, std::pair<std::queue<InternetDatagram>, size_t>> arp_wait_q{};
 
     void send_eth_frame_ip(const InternetDatagram&, const EthernetAddress&);
     void send_eth_frame_arp_req(const uint32_t);
     void send_eth_frame_arp_resp(const uint32_t, const EthernetAddress&);
+    void update_arp_map(const uint32_t, const EthernetAddress&);
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses
     NetworkInterface(const EthernetAddress &ethernet_address, const Address &ip_address);

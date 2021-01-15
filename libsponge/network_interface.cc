@@ -90,10 +90,31 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
         auto arp_wait_q_lookup = arp_wait_q.find(next_hop_ip);
         if (arp_wait_q_lookup == arp_wait_q.end()) { // not already waiting for an ARP response
             send_eth_frame_arp_req(next_hop_ip);
-            arp_wait_q.insert(std::make_pair(next_hop_ip, std::queue<InternetDatagram>()));
+            size_t zero = 0;
+            arp_wait_q.insert(std::make_pair(next_hop_ip, std::make_pair(std::queue<InternetDatagram>(), zero)));
             arp_wait_q_lookup = arp_wait_q.find(next_hop_ip);
         }
-        (*arp_wait_q_lookup).second.push(dgram);
+        (*arp_wait_q_lookup).second.first.push(dgram);
+    }
+}
+
+// Update the ARP map, process queued IP datagrams if necessary
+void NetworkInterface::update_arp_map(const uint32_t ip, const EthernetAddress& eth_addr) {
+    if (arp_map.find(ip) == arp_map.end()) {
+        size_t zero = 0;
+        arp_map.insert({
+            ip,
+            std::make_pair(eth_addr, zero)
+        });
+    }
+    auto lookup_res = arp_wait_q.find(ip);
+    if (lookup_res != arp_wait_q.end()) {
+        auto wait_q = (*lookup_res).second.first;
+        while (!wait_q.empty()) {
+            auto front_of_q = wait_q.front();
+            send_eth_frame_ip(front_of_q, eth_addr);
+            wait_q.pop();
+        }
     }
 }
 
@@ -112,6 +133,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
                 return optional<InternetDatagram>();
             }
             send_eth_frame_arp_resp(arp_msg.sender_ip_address, frame_header.src);
+            update_arp_map(arp_msg.sender_ip_address, arp_msg.sender_ethernet_address);
         } 
         return optional<InternetDatagram>();
     } else if (frame_header.dst == this->_ethernet_address) {
@@ -129,10 +151,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
             if (parse_res != ParseResult::NoError) {
                 return optional<InternetDatagram>();
             }
-            arp_map.insert({
-                arp_msg.sender_ip_address,
-                std::make_pair(arp_msg.sender_ethernet_address, static_cast<size_t>(0))
-            });
+            update_arp_map(arp_msg.sender_ip_address, arp_msg.sender_ethernet_address);
         }
     }
         return optional<InternetDatagram>();
@@ -141,10 +160,19 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick(const size_t ms_since_last_tick) {
     for (auto it = arp_map.begin(); it != arp_map.end();) {
-        auto value = (*it).second;
-        value.second += ms_since_last_tick;
-        if (value.second >= 30000) {
+        auto new_time = it->second.second + ms_since_last_tick;
+        arp_map[it->first] = std::make_pair(it->second.first, new_time);
+        if (new_time >= 30000) {
             it = arp_map.erase(it);
+        } else {
+            it = std::next(it);
+        }
+    }
+    for (auto it = arp_wait_q.begin(); it != arp_wait_q.end();) {
+        auto new_time = it->second.second + ms_since_last_tick;
+        arp_wait_q[it->first] = std::make_pair(it->second.first, new_time);
+        if (new_time >= 5000) {
+            it = arp_wait_q.erase(it);
         } else {
             it = std::next(it);
         }
