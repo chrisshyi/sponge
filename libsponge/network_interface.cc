@@ -161,7 +161,8 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
 void NetworkInterface::tick(const size_t ms_since_last_tick) {
     for (auto it = arp_map.begin(); it != arp_map.end();) {
         auto new_time = it->second.second + ms_since_last_tick;
-        arp_map[it->first] = std::make_pair(it->second.first, new_time);
+        auto& time = std::get<1>(it->second);
+        time = new_time;
         if (new_time >= 30000) {
             it = arp_map.erase(it);
         } else {
@@ -170,7 +171,8 @@ void NetworkInterface::tick(const size_t ms_since_last_tick) {
     }
     for (auto it = arp_wait_q.begin(); it != arp_wait_q.end();) {
         auto new_time = it->second.second + ms_since_last_tick;
-        arp_wait_q[it->first] = std::make_pair(it->second.first, new_time);
+        auto& time = std::get<1>(it->second);
+        time = new_time;
         if (new_time >= 5000) {
             it = arp_wait_q.erase(it);
         } else {
